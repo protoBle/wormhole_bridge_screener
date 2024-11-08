@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-import { getMint } from '@solana/spl-token';
+import { getMint, Mint } from '@solana/spl-token';
 import { Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
 
 // Define types for token data and providers
@@ -31,9 +31,22 @@ const providers: Record<ProviderKey, ethers.providers.JsonRpcProvider> = {
     moonbeam: new ethers.providers.JsonRpcProvider('https://rpc.api.moonbeam.network')
 };
 
+// bridge contract 
+const bridge_address: Record<ProviderKey, string> = {
+    eth: '0x3ee18B2214AFF97000D974cf647E7C347E8fa585',
+    avax: '0x0e082f06ff657d94310cb8ce8b0d9a04541d8052',
+    ftm: '0x7C9Fc5741288cDFdD83CeB07f3ea7e22618D79D2',
+    matic: '0x5a58505a96d1dbf8df91cb21b54419fc36e93fde',
+    oasis: '0x5848C791e09901b40A9Ef749f2a6735b418d7564',
+    bsc: '0xB6F6D86a8f9879A9c87f643768d9efc38c1Da6E7',
+    aurora: '',
+    celo: '',
+    moonbeam: ''
+};
+
 const outputDecimals: OutputDecimalsMap = {};
 
-async function etherBalance(origin: ProviderKey, sourceAddrRaw: string, account: string): Promise<string | number> {
+async function getTokenBalance(origin: ProviderKey, sourceAddrRaw: string, account: string): Promise<number> {
     try {
         const provider = providers[origin];
         const contract = new ethers.Contract(sourceAddrRaw, erc20Abi, provider);
@@ -41,7 +54,7 @@ async function etherBalance(origin: ProviderKey, sourceAddrRaw: string, account:
         const symbol = await contract.symbol();
         const decimals = await contract.decimals();
         const balance = await contract.balanceOf(account);
-        const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+        const formattedBalance = parseFloat(ethers.utils.formatUnits(balance, decimals));
 
         console.log(origin, symbol, decimals, formattedBalance, 'balance');
         outputDecimals[`${origin}_${sourceAddrRaw}`] = decimals;
@@ -52,7 +65,7 @@ async function etherBalance(origin: ProviderKey, sourceAddrRaw: string, account:
     return 0;
 }
 
-async function evmDecimals(origin: ProviderKey, sourceAddrRaw: string): Promise<string | undefined> {
+async function evmDecimals(origin: ProviderKey, sourceAddrRaw: string): Promise<number | undefined> {
     try {
         const provider = providers[origin];
         const contract = new ethers.Contract(sourceAddrRaw, erc20Abi, provider);
@@ -60,7 +73,7 @@ async function evmDecimals(origin: ProviderKey, sourceAddrRaw: string): Promise<
         const symbol = await contract.symbol();
         const decimals = await contract.decimals();
         const totalSupply = await contract.totalSupply();
-        const formattedSupply = ethers.utils.formatUnits(totalSupply, decimals);
+        const formattedSupply = parseFloat(ethers.utils.formatUnits(totalSupply, decimals));
 
         outputDecimals[`${origin}_${sourceAddrRaw}`] = decimals;
         return formattedSupply;
@@ -71,11 +84,12 @@ async function evmDecimals(origin: ProviderKey, sourceAddrRaw: string): Promise<
 
 async function solDecimals(sourceAddr: string) {
     const RPC_URL = 'https://rpc.ankr.com/solana';
-    const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
+    const connection = new Connection(RPC_URL, 'confirmed');
     const address = new PublicKey(sourceAddr);
-    const mintInfo: object = await getMint(connection, address);
-    /* 
-    console.log("Token Supply: ", mintInfo.supply.toString());
+    await connection.getAccountInfo(address)
+    //const mintInfo : Mint = await getMint(connection, address);
+    
+    /*console.log("Token Supply: ", mintInfo.supply.toString());
     console.log("Decimals: ", mintInfo.decimals);
     console.log("Mint Authority: ", mintInfo.mintAuthority?.toString());
     console.log("Freeze Authority: ", mintInfo.freezeAuthority?.toString()); */
@@ -119,10 +133,6 @@ export async function getTokenData(chain: string, rawAddr: string): Promise<numb
         case 'aptos':
             terraDecimals(rawAddr);
             break;
-        case 'eth':
-            var bal = await etherBalance(chain as ProviderKey, rawAddr, '0x3ee18B2214AFF97000D974cf647E7C347E8fa585');
-            result = typeof bal === 'string'? parseFloat(bal) : bal
-            break;
         default:
             var bal = await evmDecimals(chain as ProviderKey, rawAddr) || 0;
             result = typeof bal === 'string'? parseFloat(bal) : bal
@@ -157,7 +167,10 @@ export async function fetchTokenSymbolsfromCSV(url: string): Promise<string[]> {
     const symbol_list: string[] = [];
     const rows = await fetchCSV(url);
     for (const row of rows) {
-        symbol_list.push(row[1])
+        let source_symbol = row[0];
+        if(source_symbol === 'eth'){
+            symbol_list.push(row[1])
+        }
     }
     return symbol_list
 }
@@ -170,14 +183,19 @@ export async function fetchTokenDatafromCSV(url: string, symbol: string): Promis
     const tokenData_map: Record<string, number> = {};
     for (const row of rows) {
         let symbol_data = row[1];
+        let source_symbol = row[0];
         if (symbol_data === symbol) {
             for (const i of addressIndices) {
                 if (row[i]) { // Check if the cell is not empty
                     symbol = headers[i].slice(0, -7); // Remove 'Address' suffix
-                    symbol = (symbol === 'source') ? row[0] : symbol;
-                    const totalSupply = await getTokenData(symbol, row[i]);
-                    console.log(symbol, row[i], totalSupply);
-                    tokenData_map[symbol] = totalSupply;
+                    if(symbol === 'source') {
+                        const token_balance = await getTokenBalance(source_symbol as ProviderKey, row[i], '0x3ee18B2214AFF97000D974cf647E7C347E8fa585');
+                        tokenData_map[source_symbol] = token_balance;
+                    } else{
+                        const totalSupply = await getTokenData(symbol, row[i]);
+                        console.log(symbol, row[i], totalSupply);
+                        tokenData_map[symbol] = totalSupply;
+                    }
                 }
             }
             console.log(""); // Line break for readability
