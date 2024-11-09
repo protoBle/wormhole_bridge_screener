@@ -83,29 +83,12 @@ async function evmDecimals(origin: ProviderKey, sourceAddrRaw: string): Promise<
 }
 
 async function solDecimals(sourceAddr: string) {
-    const RPC_URL = 'https://rpc.ankr.com/solana';
+    const RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=bf459c4b-ed80-4bda-9c9f-39dff054126b'//'https://rpc.ankr.com/solana';
     const connection = new Connection(RPC_URL, 'confirmed');
-    const address = new PublicKey(sourceAddr);
-    await connection.getAccountInfo(address)
-    //const mintInfo : Mint = await getMint(connection, address);
-    
-    /*console.log("Token Supply: ", mintInfo.supply.toString());
-    console.log("Decimals: ", mintInfo.decimals);
-    console.log("Mint Authority: ", mintInfo.mintAuthority?.toString());
-    console.log("Freeze Authority: ", mintInfo.freezeAuthority?.toString()); */
-    /* const RPC_URL = 'https://api.devnet.solana.com';
-    const connection = new Connection(RPC_URL, 'confirmed');
-    const mintAddress = new PublicKey(sourceAddr);
 
-    try {
-        const mintInfo = await connection.getAccountInfo(mintAddress);
-        if (mintInfo) {
-            console.log("Decimals:", mintInfo.data[0]); // Adjust based on actual structure
-            console.log("Supply:", mintInfo.lamports);
-        }
-    } catch (error) {
-        console.error('Error fetching token supply:', error);
-    } */
+    const mintPublicKey = new PublicKey(sourceAddr);
+    const supplyInfo = await connection.getTokenSupply(mintPublicKey);
+    return supplyInfo.value.uiAmount
 }
 
 function terraDecimals(sourceAddr: string) {
@@ -127,7 +110,8 @@ export async function getTokenData(chain: string, rawAddr: string): Promise<numb
     let result: number = 0;
     switch (chain) {
         case 'sol':
-            await solDecimals(rawAddr);
+            var bal = await solDecimals(rawAddr) || 0;
+            result = typeof bal === 'string'? parseFloat(bal) : bal
             break;
         case 'terra':
         case 'aptos':
@@ -163,27 +147,29 @@ export async function fetchCSV(url: string): Promise<string[][]> {
     return [];
 }
 
-export async function fetchTokenSymbolsfromCSV(url: string): Promise<string[]> {
+export async function fetchTokenSymbolsfromCSV(url: string, source_chain: string): Promise<string[]> {
     const symbol_list: string[] = [];
     const rows = await fetchCSV(url);
     for (const row of rows) {
         let source_symbol = row[0];
-        if(source_symbol === 'eth'){
+        if(source_symbol === source_chain){
             symbol_list.push(row[1])
         }
     }
     return symbol_list
 }
 
-export async function fetchTokenDatafromCSV(url: string, symbol: string): Promise<Record<string, number>> {
+export async function fetchTokenDatafromCSV(url: string, symbol: string): Promise<[Record<string, number>, string []]> {
     const rows = await fetchCSV(url);
     const headers = rows[0];
     const addressIndices = getAddressIndices(rows[0]);
 
     const tokenData_map: Record<string, number> = {};
+    const sourceChain_set = new Set<string>;
     for (const row of rows) {
         let symbol_data = row[1];
         let source_symbol = row[0];
+        sourceChain_set.add(source_symbol)
         if (symbol_data === symbol) {
             for (const i of addressIndices) {
                 if (row[i]) { // Check if the cell is not empty
@@ -201,6 +187,7 @@ export async function fetchTokenDatafromCSV(url: string, symbol: string): Promis
             console.log(""); // Line break for readability
         }
     }
-    //console.log(tokenData_map);
-    return tokenData_map;
+    //console.log(sourceChain_set);
+    const sourceChain_list = Array.from(sourceChain_set);
+    return [tokenData_map, sourceChain_list];
 }

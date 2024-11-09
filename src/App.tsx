@@ -15,8 +15,8 @@ const TableComponent: React.FC<TableComponentProps> = ({ data }) => {
       <table className="styled-table">
         <tbody>
         <tr>
-          <th>Symbol</th>
-          <th>TotalSupply</th>
+          <th>CHAIN</th>
+          <th>TOTAL SUPPLY</th>
         </tr>
           {Object.entries(data).map(([key, value]) => (
             <tr key={key} >
@@ -34,11 +34,11 @@ const TableComponent: React.FC<TableComponentProps> = ({ data }) => {
 
 interface CryptoTableProps {
   cryptoSymbols: string[];
+  selectedSymbol: string | null;
   onSymbolClick: (symbol: string) => void;
 }
 
-const CryptoTable: React.FC<CryptoTableProps> = ({ cryptoSymbols , onSymbolClick }) => {
-  const symbolsWithoutFirst = cryptoSymbols.slice(1)
+const CryptoTable: React.FC<CryptoTableProps> = ({ cryptoSymbols , selectedSymbol, onSymbolClick }) => {
 
   // Handler function for clicking on a symbol
   const handleSymbolClick = (symbol: string) => {
@@ -48,13 +48,49 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ cryptoSymbols , onSymbolClick
 
   return (
     <div>
+      <div style={{ overflowX: "auto" }}>
+          <table className="styled-table">
+                <thead>
+                    <tr>
+                      <th style={{color:"green"}}>SYMBOL:</th>
+                        {cryptoSymbols.map((symbol, index) => (
+                           <th key={index} onClick={() => handleSymbolClick(symbol)} 
+                           style={{color: symbol === selectedSymbol ? "black" : "white"}}>{symbol}</th>
+                        ))}
+                    </tr>
+                </thead>
+          </table>
+      </div>
+    </div>
+  );
+};
+
+interface SourceChainProps {
+  sourceChain: string[];
+  selectedChain: string | null;
+  onSymbolClick: (symbol: string) => void;
+}
+
+const SourceChainTable: React.FC<SourceChainProps> = ({ sourceChain , selectedChain, onSymbolClick }) => {
+  const symbolsWithoutFirst = sourceChain.slice(1)
+
+  // Handler function for clicking on a symbol
+  const handleSymbolClick = (symbol: string) => {
+    onSymbolClick(symbol);
+    console.log(`Selected chain: ${symbol}`);
+  };
+
+  return (
+    <div>
       <h1>Wormhole Bridge Audit screener{" "}  </h1>
       <div style={{ overflowX: "auto" }}>
           <table className="styled-table">
                 <thead>
                     <tr>
+                      <th style={{color:"green"}}>CHAIN:</th>
                         {symbolsWithoutFirst.map((symbol, index) => (
-                           <th key={index} onClick={() => handleSymbolClick(symbol)}>{symbol}</th>
+                           <th key={index} onClick={() => handleSymbolClick(symbol)} 
+                           style={{color: symbol === selectedChain ? "black" : "white"}}>{symbol}</th>
                         ))}
                     </tr>
                 </thead>
@@ -67,6 +103,8 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ cryptoSymbols , onSymbolClick
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [symbol_list, setSymbolList] = useState<string []>([]);
+  const [selectedChain, setSelectedChain] = useState<string>('');
+  const [sourceChain_list, setSourceChain] = useState<string []>([]);
   const [tokenValue_map, setTokenValueMap] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   
@@ -76,18 +114,20 @@ function App() {
   useEffect(() => {
     const fetchSymbol = async () => {
       
-      const symbol_list = await fetchTokenSymbolsfromCSV(url)
+      const symbol_list = await fetchTokenSymbolsfromCSV(url, selectedChain)
       setSymbolList(symbol_list);
     }
     fetchSymbol()
-  }, [])
+  }, [selectedChain])
       
   //fetch token data, on setSelectedSymbol
   useEffect(() => {
     setIsLoading(true);
     const fetchData = async () => {
         try {
-            const tokenValue_map = await fetchTokenDatafromCSV(url, selectedSymbol)
+            const result_list = await fetchTokenDatafromCSV(url, selectedSymbol)
+            const sourceChain_list= result_list[1]
+            const tokenValue_map = result_list[0]
             // Calculate sum of all values except for "eth" and "NA" values
             const sum = Object.entries(tokenValue_map).reduce((acc, [key, value]) => {
               return (key !== "eth") ? acc + value : acc;
@@ -97,6 +137,7 @@ function App() {
             tokenValue_map['total']=sum
 
             setTokenValueMap(tokenValue_map);
+            setSourceChain(sourceChain_list);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -124,7 +165,8 @@ function App() {
   if (isLoading) {
     return (
       <div>
-        <CryptoTable cryptoSymbols={symbol_list} onSymbolClick={setSelectedSymbol}></CryptoTable>
+        <SourceChainTable sourceChain={sourceChain_list} selectedChain={selectedChain} onSymbolClick={setSelectedChain}></SourceChainTable>
+        <CryptoTable cryptoSymbols={symbol_list} selectedSymbol={selectedSymbol} onSymbolClick={setSelectedSymbol}></CryptoTable>
         <h1>Loading...</h1>
       </div>
     );
@@ -132,7 +174,9 @@ function App() {
 
   return (
     <div>
-      <CryptoTable cryptoSymbols={symbol_list} onSymbolClick={setSelectedSymbol}></CryptoTable>
+      <SourceChainTable sourceChain={sourceChain_list} selectedChain={selectedChain} onSymbolClick={setSelectedChain}></SourceChainTable>
+      <CryptoTable cryptoSymbols={symbol_list} selectedSymbol={selectedSymbol} onSymbolClick={setSelectedSymbol}></CryptoTable>
+      <p></p>
       <TableComponent data={tokenValue_map}/>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <ResponsiveContainer width="60%" height={400} margin-left="auto" margin-right="auto">
