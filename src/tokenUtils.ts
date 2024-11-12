@@ -4,7 +4,7 @@ import { getMint, Mint } from '@solana/spl-token';
 import { Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
 
 // Define types for token data and providers
-type ProviderKey = 'eth' | 'avax' | 'ftm' | 'matic' | 'oasis' | 'bsc' | 'aurora' | 'celo' | 'moonbeam';
+type ProviderKey = 'eth' | 'avax' | 'ftm' | 'matic' | 'oasis' | 'bsc' | 'aurora' | 'celo' | 'moonbeam' | 'base';
 type OutputDecimalsMap = { [key: string]: number };
 
 // ERC20 ABI for reading ERC20 contracts
@@ -28,11 +28,12 @@ const providers: Record<ProviderKey, ethers.providers.JsonRpcProvider> = {
     bsc: new ethers.providers.JsonRpcProvider('https://bsc-dataseed.binance.org'),
     aurora: new ethers.providers.JsonRpcProvider('https://mainnet.aurora.dev'),
     celo: new ethers.providers.JsonRpcProvider('https://forno.celo.org'),
-    moonbeam: new ethers.providers.JsonRpcProvider('https://rpc.api.moonbeam.network')
+    moonbeam: new ethers.providers.JsonRpcProvider('https://rpc.api.moonbeam.network'),
+    base: new ethers.providers.JsonRpcProvider('https://base.drpc.org'),
 };
 
 // bridge contract 
-const bridge_address: Record<ProviderKey, string> = {
+const bridge_address: Record<string, string> = {
     eth: '0x3ee18B2214AFF97000D974cf647E7C347E8fa585',
     avax: '0x0e082f06ff657d94310cb8ce8b0d9a04541d8052',
     ftm: '0x7C9Fc5741288cDFdD83CeB07f3ea7e22618D79D2',
@@ -41,7 +42,7 @@ const bridge_address: Record<ProviderKey, string> = {
     bsc: '0xB6F6D86a8f9879A9c87f643768d9efc38c1Da6E7',
     aurora: '',
     celo: '',
-    moonbeam: ''
+    moonbeam: '0xB1731c586ca89a23809861c6103F0b96B3F57D92'
 };
 
 const outputDecimals: OutputDecimalsMap = {};
@@ -175,7 +176,7 @@ export async function fetchTokenDatafromCSV(url: string, symbol: string): Promis
                 if (row[i]) { // Check if the cell is not empty
                     symbol = headers[i].slice(0, -7); // Remove 'Address' suffix
                     if(symbol === 'source') {
-                        const token_balance = await getTokenBalance(source_symbol as ProviderKey, row[i], '0x3ee18B2214AFF97000D974cf647E7C347E8fa585');
+                        const token_balance = await getTokenBalance(source_symbol as ProviderKey, row[i], bridge_address[source_symbol]);
                         tokenData_map[source_symbol] = token_balance;
                     } else{
                         const totalSupply = await getTokenData(symbol, row[i]);
