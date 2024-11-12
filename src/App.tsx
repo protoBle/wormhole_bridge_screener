@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import {fetchTokenSymbolsfromCSV, fetchTokenDatafromCSV, getTokenData} from "./tokenUtils"
 import './App.css';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
-
+import { NavBar } from "./NavBar"
 
 interface TableComponentProps {
   data: { [key: string]: number | string };
@@ -32,74 +32,6 @@ const TableComponent: React.FC<TableComponentProps> = ({ data }) => {
   );
 };
 
-interface CryptoTableProps {
-  cryptoSymbols: string[];
-  selectedSymbol: string | null;
-  onSymbolClick: (symbol: string) => void;
-}
-
-const CryptoTable: React.FC<CryptoTableProps> = ({ cryptoSymbols , selectedSymbol, onSymbolClick }) => {
-
-  // Handler function for clicking on a symbol
-  const handleSymbolClick = (symbol: string) => {
-    onSymbolClick(symbol);
-    console.log(`Selected symbol: ${symbol}`);
-  };
-
-  return (
-    <div>
-      <div style={{ overflowX: "auto" }}>
-          <table className="styled-table">
-                <thead>
-                    <tr>
-                      <th style={{color:"green"}}>SYMBOL:</th>
-                        {cryptoSymbols.map((symbol, index) => (
-                           <th key={index} onClick={() => handleSymbolClick(symbol)} 
-                           style={{color: symbol === selectedSymbol ? "black" : "white"}}>{symbol}</th>
-                        ))}
-                    </tr>
-                </thead>
-          </table>
-      </div>
-    </div>
-  );
-};
-
-interface SourceChainProps {
-  sourceChain: string[];
-  selectedChain: string | null;
-  onSymbolClick: (symbol: string) => void;
-}
-
-const SourceChainTable: React.FC<SourceChainProps> = ({ sourceChain , selectedChain, onSymbolClick }) => {
-  const symbolsWithoutFirst = sourceChain.slice(1)
-
-  // Handler function for clicking on a symbol
-  const handleSymbolClick = (symbol: string) => {
-    onSymbolClick(symbol);
-    console.log(`Selected chain: ${symbol}`);
-  };
-
-  return (
-    <div>
-      <h1>Wormhole Bridge Audit screener{" "}  </h1>
-      <div style={{ overflowX: "auto" }}>
-          <table className="styled-table">
-                <thead>
-                    <tr>
-                      <th style={{color:"green"}}>CHAIN:</th>
-                        {symbolsWithoutFirst.map((symbol, index) => (
-                           <th key={index} onClick={() => handleSymbolClick(symbol)} 
-                           style={{color: symbol === selectedChain ? "black" : "white"}}>{symbol}</th>
-                        ))}
-                    </tr>
-                </thead>
-          </table>
-      </div>
-    </div>
-  );
-};
-
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [symbol_list, setSymbolList] = useState<string []>([]);
@@ -112,12 +44,13 @@ function App() {
   
   //fetch list of symbols once
   useEffect(() => {
-    const fetchSymbol = async () => {
+      fetchTokenSymbolsfromCSV(url, selectedChain)
+      .then(setSymbolList)
+      .then(()=>setIsLoading(false))
+      .catch((error)=>{
+        console.log(error)
+      })
       
-      const symbol_list = await fetchTokenSymbolsfromCSV(url, selectedChain)
-      setSymbolList(symbol_list);
-    }
-    fetchSymbol()
   }, [selectedChain])
       
   //fetch token data, on setSelectedSymbol
@@ -126,7 +59,7 @@ function App() {
     const fetchData = async () => {
         try {
             const result_list = await fetchTokenDatafromCSV(url, selectedSymbol)
-            const sourceChain_list= result_list[1]
+            const sourceChain_list= result_list[1].slice(1)
             const tokenValue_map = result_list[0]
             // Calculate sum of all values except for "eth" and "NA" values
             const sum = Object.entries(tokenValue_map).reduce((acc, [key, value]) => {
@@ -165,8 +98,8 @@ function App() {
   if (isLoading) {
     return (
       <div>
-        <SourceChainTable sourceChain={sourceChain_list} selectedChain={selectedChain} onSymbolClick={setSelectedChain}></SourceChainTable>
-        <CryptoTable cryptoSymbols={symbol_list} selectedSymbol={selectedSymbol} onSymbolClick={setSelectedSymbol}></CryptoTable>
+        <NavBar list={sourceChain_list} selected={selectedChain} onSymbolClick={setSelectedChain}></NavBar>
+        <NavBar list={symbol_list} selected={selectedSymbol} onSymbolClick={setSelectedSymbol}></NavBar>
         <h1>Loading...</h1>
       </div>
     );
@@ -174,8 +107,8 @@ function App() {
 
   return (
     <div>
-      <SourceChainTable sourceChain={sourceChain_list} selectedChain={selectedChain} onSymbolClick={setSelectedChain}></SourceChainTable>
-      <CryptoTable cryptoSymbols={symbol_list} selectedSymbol={selectedSymbol} onSymbolClick={setSelectedSymbol}></CryptoTable>
+      <NavBar list={sourceChain_list} selected={selectedChain} onSymbolClick={setSelectedChain}></NavBar>
+      <NavBar list={symbol_list} selected={selectedSymbol} onSymbolClick={setSelectedSymbol}></NavBar>
       <p></p>
       <TableComponent data={tokenValue_map}/>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
