@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect } from "react";
-import {fetchTokenSymbolsfromCSV, fetchTokenDatafromCSV, getTokenData} from "./tokenUtils"
+import {fetchTokenSymbolsfromCSV, fetchTokenDatafromCSV} from "./tokenUtils"
 import './App.css';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { NavBar } from "./NavBar"
@@ -11,17 +11,19 @@ interface TableComponentProps {
 
 const TableComponent: React.FC<TableComponentProps> = ({ data }) => {
   return (
-    <div style={{padding: "0 20px"}}>
-      <table className="styled-table">
+    <div className="overflow-x-auto my-8">
+      <table className="w-1/2 mx-auto table-auto border-collapse text-left text-sm text-gray-500 rounded-lg border">
+        <thead className="bg-blue-300">
+          <tr>
+            <th className="px-6 py-3 font-semibold text-gray-700 border-r">CHAIN</th>
+            <th className="px-6 py-3 font-semibold text-gray-700">TOTAL SUPPLY</th>
+          </tr>
+        </thead>
         <tbody>
-        <tr>
-          <th>CHAIN</th>
-          <th>TOTAL SUPPLY</th>
-        </tr>
           {Object.entries(data).map(([key, value]) => (
-            <tr key={key} >
-              <td style={{ textAlign: "left" }}>{key.toUpperCase()}</td>
-              <td style={{ textAlign: "left" }}>
+            <tr key={key} className="border-b border-gray-200 hover:bg-gray-50">
+              <td className="px-6 py-4 border-r">{key.toUpperCase()}</td>
+              <td className="px-6 py-4">
                 {typeof value === "number" ? value.toLocaleString() : parseFloat(value).toLocaleString()}
               </td>
             </tr>
@@ -61,9 +63,9 @@ function App() {
             const result_list = await fetchTokenDatafromCSV(url, selectedSymbol)
             const sourceChain_list= result_list[1].slice(1)
             const tokenValue_map = result_list[0]
-            // Calculate sum of all values except for "eth" and "NA" values
+            // Calculate sum of all values except for source and "NA" values
             const sum = Object.entries(tokenValue_map).reduce((acc, [key, value]) => {
-              return (key !== "eth") ? acc + value : acc;
+              return (key !== selectedChain) ? acc + value : acc;
             }, 0);
 
             console.log("Sum:", sum);
@@ -84,47 +86,55 @@ function App() {
 
   interface TokenData {
     name: string;
-    value: number;
+    source: number;
+    total: number;
   }
 
-  // Convert data to an array suitable for Recharts, excluding zero values
-  const bar_data: TokenData[] = Object.entries(tokenValue_map)
-  .filter(([, value]) => value > 0)
-  .map(([name, value]) => ({
-    name,
-    value: value as number,
-  }));
+  const bar_data : TokenData [] = [{
+    name: selectedSymbol, source: tokenValue_map[selectedChain], total: tokenValue_map['total']
+  }]
 
   if (isLoading) {
     return (
       <div>
-        <NavBar list={sourceChain_list} selected={selectedChain} onSymbolClick={setSelectedChain}></NavBar>
-        <NavBar list={symbol_list} selected={selectedSymbol} onSymbolClick={setSelectedSymbol}></NavBar>
+        {header()}
         <h1>Loading...</h1>
       </div>
     );
   }
 
+  
+
   return (
     <div>
-      <NavBar list={sourceChain_list} selected={selectedChain} onSymbolClick={setSelectedChain}></NavBar>
-      <NavBar list={symbol_list} selected={selectedSymbol} onSymbolClick={setSelectedSymbol}></NavBar>
+      {header()}
+      
       <p></p>
       <TableComponent data={tokenValue_map}/>
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      {(selectedSymbol.length !== 0) && <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <ResponsiveContainer width="60%" height={400} margin-left="auto" margin-right="auto">
-          <BarChart layout={'horizontal'} width={400} height={400} data={bar_data} barGap={10} barSize={30}>
+          <BarChart layout={'horizontal'} width={400} height={400} data={bar_data} barGap={1} barSize={30}>
             <CartesianGrid strokeDasharray="2 2" stroke="#ccc"/>
             <XAxis dataKey="name" label={{ position: 'insideBottom', offset: -5, dy: 10 }} />
             <YAxis tickFormatter={(value) => value.toExponential(2)}/>
             <Tooltip />
-            <Bar dataKey="value" fill="#8884d8" />
+            <Bar dataKey="source" fill="#3B82F6" />
+            <Bar dataKey="total" fill="#93C5FD" />
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </div>}
       
     </div>
   );
+
+  function header() {
+    return <>
+      <h1 className="text-3xl font-bold">Portal Bridge (wormhole) Audit screener </h1>
+      <h1 className="text-xs p-4">This screener is designed to verify whether the locked value on the source chain matches the minted value on the destination chain.</h1>
+      <NavBar list={sourceChain_list} selected={selectedChain} text_size='text-sm' onSymbolClick={setSelectedChain}></NavBar>
+      <NavBar list={symbol_list} selected={selectedSymbol} text_size='text-xs' onSymbolClick={setSelectedSymbol}></NavBar>
+    </>;
+  }
 }
 
 export default App;

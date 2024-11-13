@@ -1,10 +1,11 @@
 interface SourceChainProps {
     list: string[];
     selected: string | null;
+    text_size: string;
     onSymbolClick: (symbol: string) => void;
   }
   
-export const NavBar: React.FC<SourceChainProps> = ({ list , selected, onSymbolClick }) => {
+export const NavBar: React.FC<SourceChainProps> = ({ list , selected, text_size, onSymbolClick }) => {
 
 // Handler function for clicking on a symbol
 const handleSymbolClick = (symbol: string) => {
@@ -13,21 +14,19 @@ const handleSymbolClick = (symbol: string) => {
 };
 
 return (
-    <div>
-    <h1>Wormhole Bridge Audit screener{" "}  </h1>
-    <div style={{ overflowX: "auto" }}>
-        <table className="styled-table">
-                <thead>
-                    <tr>
-                    <th style={{color:"green"}}>CHAIN:</th>
-                        {list.map((symbol, index) => (
-                            <th key={index} onClick={() => handleSymbolClick(symbol)} 
-                            style={{color: symbol === selected ? "black" : "white"}}>{symbol}</th>
-                        ))}
-                    </tr>
-                </thead>
-        </table>
-    </div>
+    <div className="flex items-center justify-center">
+        <div className="flex space-x-4 p-0 rounded-md border-b-2 overflow-x-auto">
+            
+            {list.map((symbol, index) => (
+                <button onClick={() => handleSymbolClick(symbol)} className={`relative px-4 py-2 text-black rounded ${text_size}`}>
+                    {symbol}
+                    <span
+                    className={`absolute bottom-0 left-0 right-0 h-1 bg-blue-300 ${
+                        symbol === selected ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+                    }`}></span>
+                </button>
+            ))}
+        </div>
     </div>
     );
 };
