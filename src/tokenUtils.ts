@@ -170,7 +170,8 @@ export async function fetchTokenDatafromCSV(url: string, symbol: string): Promis
     for (const row of rows) {
         let symbol_data = row[1];
         let source_symbol = row[0];
-        sourceChain_set.add(source_symbol)
+        if(source_symbol.length !== 0)
+            sourceChain_set.add(source_symbol)
         if (symbol_data === symbol) {
             for (const i of addressIndices) {
                 if (row[i]) { // Check if the cell is not empty
