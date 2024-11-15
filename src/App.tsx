@@ -6,16 +6,18 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cartesia
 import { NavBar } from "./NavBar"
 
 interface TableComponentProps {
-  data: { [key: string]: number | string };
+  data: { [key: string]: number | string },
+  colName: string,
+  color: string
 }
 
-const TableComponent: React.FC<TableComponentProps> = ({ data }) => {
+const TableComponent: React.FC<TableComponentProps> = ({ data , colName, color}) => {
   return (
     <div className="overflow-x-auto my-8">
       <table className="w-1/2 mx-auto table-auto border-collapse text-left text-sm text-gray-500 rounded-lg border">
-        <thead className="bg-blue-300">
+        <thead className={color}>
           <tr>
-            <th className="px-6 py-3 font-semibold text-gray-700 border-r">CHAIN</th>
+            <th className="px-6 py-3 font-semibold text-gray-700 border-r">{colName}</th>
             <th className="px-6 py-3 font-semibold text-gray-700">TOTAL SUPPLY</th>
           </tr>
         </thead>
@@ -35,13 +37,21 @@ const TableComponent: React.FC<TableComponentProps> = ({ data }) => {
 };
 
 function App() {
+  interface TokenData {
+    name: string;
+    source: number;
+    total: number;
+  }
+
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [symbol_list, setSymbolList] = useState<string []>([]);
   const [selectedChain, setSelectedChain] = useState<string>('');
   const [sourceChain_list, setSourceChain] = useState<string []>([]);
-  const [tokenValue_map, setTokenValueMap] = useState<Record<string, number>>({});
+  const [destTokenValue_map, setTokenValueMap] = useState<Record<string, number>>({});
+  const [sourceTokenValue_map, setSourceTokenValue_map] = useState<Record<string, number>>({});
+  const [barGraphData_list, setBarGraphData_list] = useState<TokenData []>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const url = "https://raw.githubusercontent.com/wormhole-foundation/wormhole-token-list/refs/heads/main/content/by_source.csv";
   
   //fetch list of symbols once
@@ -71,6 +81,21 @@ function App() {
             console.log("Sum:", sum);
             tokenValue_map['total']=sum
 
+            if(selectedChain.length!==0){
+              const sourceTokenValue = tokenValue_map[selectedChain]
+              const map :Record<string, number>= {}
+              map[selectedChain] = sourceTokenValue
+              setSourceTokenValue_map(map)
+              delete tokenValue_map[selectedChain]
+
+              const bar_data : TokenData [] = [{
+                name: selectedSymbol, 
+                source: sourceTokenValue, 
+                total: tokenValue_map['total']
+              }]
+              
+              setBarGraphData_list(bar_data);
+            }
             setTokenValueMap(tokenValue_map);
             setSourceChain(sourceChain_list);
         } catch (error) {
@@ -83,16 +108,6 @@ function App() {
     fetchData();
   }, [selectedSymbol]);
 
-
-  interface TokenData {
-    name: string;
-    source: number;
-    total: number;
-  }
-
-  const bar_data : TokenData [] = [{
-    name: selectedSymbol, source: tokenValue_map[selectedChain], total: tokenValue_map['total']
-  }]
 
   if (isLoading) {
     return (
@@ -108,12 +123,11 @@ function App() {
   return (
     <div>
       {header()}
-      
-      <p></p>
-      <TableComponent data={tokenValue_map}/>
+      <TableComponent data={sourceTokenValue_map} colName={"SOURCE"} color={"bg-blue-500"}/>
+      <TableComponent data={destTokenValue_map} colName={"DESTINATION"} color={"bg-blue-300"}/>
       {(selectedSymbol.length !== 0) && <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <ResponsiveContainer width="60%" height={400} margin-left="auto" margin-right="auto">
-          <BarChart layout={'horizontal'} width={400} height={400} data={bar_data} barGap={1} barSize={30}>
+          <BarChart layout={'horizontal'} width={400} height={400} data={barGraphData_list} barGap={1} barSize={30}>
             <CartesianGrid strokeDasharray="2 2" stroke="#ccc"/>
             <XAxis dataKey="name" label={{ position: 'insideBottom', offset: -5, dy: 10 }} />
             <YAxis tickFormatter={(value) => value.toExponential(2)}/>
