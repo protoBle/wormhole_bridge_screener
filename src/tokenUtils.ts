@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 import { getMint, Mint } from '@solana/spl-token';
-import { Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
+import { Connection, clusterApiUrl, PublicKey, GetProgramAccountsFilter } from '@solana/web3.js';
 
 // Define types for token data and providers
 type ProviderKey = 'eth' | 'avax' | 'ftm' | 'matic' | 'oasis' | 'bsc' | 'aurora' | 'celo' | 'moonbeam' | 'base';
@@ -42,24 +42,33 @@ const bridge_address: Record<string, string> = {
     bsc: '0xB6F6D86a8f9879A9c87f643768d9efc38c1Da6E7',
     aurora: '',
     celo: '',
-    moonbeam: '0xB1731c586ca89a23809861c6103F0b96B3F57D92'
+    moonbeam: '0xB1731c586ca89a23809861c6103F0b96B3F57D92',
+    sol:'GugU1tP7doLeTw9hQP51xRJyS8Da1fWxuiy2rVrnMD2m'
 };
 
 const outputDecimals: OutputDecimalsMap = {};
 
-async function getTokenBalance(origin: ProviderKey, sourceAddrRaw: string, account: string): Promise<number> {
+async function getTokenBalance(chain: string, sourceAddrRaw: string, account: string): Promise<number> {
+    
     try {
-        const provider = providers[origin];
-        const contract = new ethers.Contract(sourceAddrRaw, erc20Abi, provider);
+        switch (chain) {
+            case 'sol':
+                var bal = await splBalance(sourceAddrRaw, account) || 0;
+                return typeof bal === 'string'? parseFloat(bal) : bal
+                break;
+            default:
+                const provider = providers[chain as ProviderKey];
+                const contract = new ethers.Contract(sourceAddrRaw, erc20Abi, provider);
 
-        const symbol = await contract.symbol();
-        const decimals = await contract.decimals();
-        const balance = await contract.balanceOf(account);
-        const formattedBalance = parseFloat(ethers.utils.formatUnits(balance, decimals));
+                const symbol = await contract.symbol();
+                const decimals = await contract.decimals();
+                const balance = await contract.balanceOf(account);
+                const formattedBalance = parseFloat(ethers.utils.formatUnits(balance, decimals));
 
-        console.log(origin, symbol, decimals, formattedBalance, 'balance');
-        outputDecimals[`${origin}_${sourceAddrRaw}`] = decimals;
-        return formattedBalance;
+                console.log(origin, symbol, decimals, formattedBalance, 'balance');
+                outputDecimals[`${origin}_${sourceAddrRaw}`] = decimals;
+                return formattedBalance;
+        }
     } catch (error) {
         console.error(`Failed to fetch balance for ${origin} at ${sourceAddrRaw}:`, error);
     }
@@ -90,6 +99,50 @@ async function solDecimals(sourceAddr: string) {
     const mintPublicKey = new PublicKey(sourceAddr);
     const supplyInfo = await connection.getTokenSupply(mintPublicKey);
     return supplyInfo.value.uiAmount
+}
+
+async function splBalance(sourceAddr: string, account: string) {
+    const RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=bf459c4b-ed80-4bda-9c9f-39dff054126b'//'https://rpc.ankr.com/solana';
+    const connection = new Connection(RPC_URL, 'confirmed');
+
+    // Parse wallet and token mint addresses
+    const walletPublicKey = new PublicKey(account);
+    const tokenMintPublicKey = new PublicKey(sourceAddr);
+    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+    
+    const filters:GetProgramAccountsFilter[] = [
+        {
+          dataSize: 165,    //size of account (bytes)
+        },
+        {
+          memcmp: {
+            offset: 32,     //location of our query in the account (bytes)
+            bytes: walletPublicKey.toBase58(),  //our search criteria, a base58 encoded string
+          }            
+        }
+     ];
+
+     const accounts = await connection.getParsedProgramAccounts(
+        TOKEN_PROGRAM_ID,   //SPL Token Program, new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+        {filters: filters}
+    );
+    console.log(`Found ${accounts.length} token account(s) for wallet ${walletPublicKey}.`)
+
+    let splBalance : number = 0;
+    accounts.forEach((account, i) => {
+        //Parse the account data
+        const parsedAccountInfo:any = account.account.data;
+        const mintAddress:string = parsedAccountInfo["parsed"]["info"]["mint"];
+        const tokenBalance: number = parsedAccountInfo["parsed"]["info"]["tokenAmount"]["uiAmount"];
+        //Log results
+        if(mintAddress === tokenMintPublicKey.toBase58()){
+            console.log(`Token Account No. ${i + 1}: ${account.pubkey.toString()}`);
+            console.log(`--Token Mint: ${mintAddress}`);
+            console.log(`--Token Balance: ${tokenBalance}`);
+            splBalance = tokenBalance
+        }
+    });
+    return splBalance
 }
 
 function terraDecimals(sourceAddr: string) {
