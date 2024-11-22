@@ -144,7 +144,8 @@ function App() {
   function header() {
     return <>
       <h1 className="text-3xl font-bold">Portal Bridge (wormhole) Audit screener </h1>
-      <h1 className="text-xs p-4">This screener is designed to verify whether the locked value on the source chain matches the minted value on the destination chain.</h1>
+      <h1 className="text-xs p-4">This screener is built to verify whether the locked value on the source chain matches the minted value on the destination chain. <a href="https://github.com/protoBle/wormhole_bridge_screener/blob/master/README.md">More info</a></h1>
+
       <NavBar list={sourceChain_list} selected={selectedChain} text_size='text-sm' onSymbolClick={setSelectedChain}></NavBar>
       <NavBar list={symbol_list} selected={selectedSymbol} text_size='text-xs' onSymbolClick={setSelectedSymbol}></NavBar>
     </>;
